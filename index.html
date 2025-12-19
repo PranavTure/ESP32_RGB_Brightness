@@ -7,23 +7,30 @@
 
 <body style="text-align:center; font-family:Arial; background-color:black; color:white;">
 
-  <h1>RGB & Brightness Control</h1>
+<h1>RGB & Brightness Control</h1>
 
-  <!-- Brightness -->
-  <input type="range" id="sliderBrightness" min="0" max="100" value="0" style="width:300px;">
-  <p>Brightness: <span id="valBrightness">0</span>%</p>
+<!-- Brightness -->
+<input type="range" id="sliderBrightness" min="0" max="100" value="0" style="width:300px; accent-color:white;">
+<p>Brightness: <span id="valBrightness">0</span>%</p>
 
-  <!-- Red -->
-  <input type="range" id="sliderR" min="0" max="100" value="0" style="width:300px;">
-  <p>Red: <span id="valR">0</span>%</p>
+<!-- Red -->
+<input type="range" id="sliderR" min="0" max="100" value="0" style="width:300px; accent-color:red;">
+<p>Red: <span id="valR">0</span>%</p>
 
-  <!-- Green -->
-  <input type="range" id="sliderG" min="0" max="100" value="0" style="width:300px;">
-  <p>Green: <span id="valG">0</span>%</p>
+<!-- Green -->
+<input type="range" id="sliderG" min="0" max="100" value="0" style="width:300px; accent-color:green;">
+<p>Green: <span id="valG">0</span>%</p>
 
-  <!-- Blue -->
-  <input type="range" id="sliderB" min="0" max="100" value="0" style="width:300px;">
-  <p>Blue: <span id="valB">0</span>%</p>
+<!-- Blue -->
+<input type="range" id="sliderB" min="0" max="100" value="0" style="width:300px; accent-color:blue;">
+<p>Blue: <span id="valB">0</span>%</p>
+
+<!-- Color preview boxes -->
+<p>Set Color (Web)</p>
+<div id="setColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
+
+<p>ESP32 Feedback Color</p>
+<div id="fbColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
 
 <script>
   // ---- DOM Elements ----
@@ -38,6 +45,9 @@
 
   const sliderB = document.getElementById("sliderB");
   const valB = document.getElementById("valB");
+
+  const setColorBox = document.getElementById("setColor");
+  const fbColorBox = document.getElementById("fbColor");
 
   // ---- MQTT Client ----
   const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
@@ -75,6 +85,8 @@
       sliderB.value = percent;
       valB.innerText = percent;
     }
+
+    updateFeedbackColor();
   });
 
   // ---- Slider Handlers (Web → ESP32) ----
@@ -82,25 +94,44 @@
     valBrightness.innerText = sliderBrightness.value;
     const pwm = Math.round((sliderBrightness.value / 100) * 65535);
     client.publish("pranav/esp32/rgb/cmd/brightness", pwm.toString());
+    updateSetColor();
   };
 
   sliderR.oninput = () => {
     valR.innerText = sliderR.value;
     const pwm = Math.round((sliderR.value / 100) * 65535);
     client.publish("pranav/esp32/rgb/cmd/r", pwm.toString());
+    updateSetColor();
   };
 
   sliderG.oninput = () => {
     valG.innerText = sliderG.value;
     const pwm = Math.round((sliderG.value / 100) * 65535);
     client.publish("pranav/esp32/rgb/cmd/g", pwm.toString());
+    updateSetColor();
   };
 
   sliderB.oninput = () => {
     valB.innerText = sliderB.value;
     const pwm = Math.round((sliderB.value / 100) * 65535);
     client.publish("pranav/esp32/rgb/cmd/b", pwm.toString());
+    updateSetColor();
   };
+
+  // ---- Color Update Functions ----
+  function updateSetColor() {
+    setColorBox.style.backgroundColor =
+      `rgb(${sliderR.value * 2.55},
+           ${sliderG.value * 2.55},
+           ${sliderB.value * 2.55})`;
+  }
+
+  function updateFeedbackColor() {
+    fbColorBox.style.backgroundColor =
+      `rgb(${sliderR.value * 2.55},
+           ${sliderG.value * 2.55},
+           ${sliderB.value * 2.55})`;
+  }
 </script>
 
 </body>
