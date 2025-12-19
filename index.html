@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP32 RGB & Brightness Control</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+
+<body style="text-align:center; font-family:Arial; background-color:black; color:white;">
+
+  <h1>RGB & Brightness Control</h1>
+
+  <!-- Brightness -->
+  <input type="range" id="sliderBrightness" min="0" max="100" value="0" style="width:300px;">
+  <p>Brightness: <span id="valBrightness">0</span>%</p>
+
+  <!-- Red -->
+  <input type="range" id="sliderR" min="0" max="100" value="0" style="width:300px;">
+  <p>Red: <span id="valR">0</span>%</p>
+
+  <!-- Green -->
+  <input type="range" id="sliderG" min="0" max="100" value="0" style="width:300px;">
+  <p>Green: <span id="valG">0</span>%</p>
+
+  <!-- Blue -->
+  <input type="range" id="sliderB" min="0" max="100" value="0" style="width:300px;">
+  <p>Blue: <span id="valB">0</span>%</p>
+
+<script>
+  // ---- DOM Elements ----
+  const sliderBrightness = document.getElementById("sliderBrightness");
+  const valBrightness = document.getElementById("valBrightness");
+
+  const sliderR = document.getElementById("sliderR");
+  const valR = document.getElementById("valR");
+
+  const sliderG = document.getElementById("sliderG");
+  const valG = document.getElementById("valG");
+
+  const sliderB = document.getElementById("sliderB");
+  const valB = document.getElementById("valB");
+
+  // ---- MQTT Client ----
+  const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
+    clientId: "WebClient_" + Math.floor(Math.random() * 10000)
+  });
+
+  // ---- On Connect ----
+  client.on("connect", () => {
+    console.log("Connected to MQTT");
+
+    client.subscribe("pranav/esp32/rgb/status/brightness");
+    client.subscribe("pranav/esp32/rgb/status/r");
+    client.subscribe("pranav/esp32/rgb/status/g");
+    client.subscribe("pranav/esp32/rgb/status/b");
+  });
+
+  // ---- ESP32 Feedback ----
+  client.on("message", (topic, message) => {
+    const pwm = parseInt(message.toString());
+    const percent = Math.round((pwm / 65535) * 100);
+
+    if (topic === "pranav/esp32/rgb/status/brightness") {
+      sliderBrightness.value = percent;
+      valBrightness.innerText = percent;
+    }
+    else if (topic === "pranav/esp32/rgb/status/r") {
+      sliderR.value = percent;
+      valR.innerText = percent;
+    }
+    else if (topic === "pranav/esp32/rgb/status/g") {
+      sliderG.value = percent;
+      valG.innerText = percent;
+    }
+    else if (topic === "pranav/esp32/rgb/status/b") {
+      sliderB.value = percent;
+      valB.innerText = percent;
+    }
+  });
+
+  // ---- Slider Handlers (Web → ESP32) ----
+  sliderBrightness.oninput = () => {
+    valBrightness.innerText = sliderBrightness.value;
+    const pwm = Math.round((sliderBrightness.value / 100) * 65535);
+    client.publish("pranav/esp32/rgb/cmd/brightness", pwm.toString());
+  };
+
+  sliderR.oninput = () => {
+    valR.innerText = sliderR.value;
+    const pwm = Math.round((sliderR.value / 100) * 65535);
+    client.publish("pranav/esp32/rgb/cmd/r", pwm.toString());
+  };
+
+  sliderG.oninput = () => {
+    valG.innerText = sliderG.value;
+    const pwm = Math.round((sliderG.value / 100) * 65535);
+    client.publish("pranav/esp32/rgb/cmd/g", pwm.toString());
+  };
+
+  sliderB.oninput = () => {
+    valB.innerText = sliderB.value;
+    const pwm = Math.round((sliderB.value / 100) * 65535);
+    client.publish("pranav/esp32/rgb/cmd/b", pwm.toString());
+  };
+</script>
+
+</body>
+</html>
