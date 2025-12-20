@@ -99,26 +99,26 @@
 
   sliderR.oninput = () => {
     valR.innerText = sliderR.value;
-    const pwm = Math.round((sliderBrightness.value / 100) * 4095);
+    const pwm = Math.round((sliderR.value / 100) * 4095);
     client.publish("pranav/esp32/rgb/cmd/r", pwm.toString());
     updateSetColor();
   };
 
   sliderG.oninput = () => {
     valG.innerText = sliderG.value;
-    const pwm = Math.round((sliderBrightness.value / 100) * 4095);
+    const pwm = Math.round((sliderG.value / 100) * 4095);
     client.publish("pranav/esp32/rgb/cmd/g", pwm.toString());
     updateSetColor();
   };
 
   sliderB.oninput = () => {
     valB.innerText = sliderB.value;
-    const pwm = Math.round((sliderBrightness.value / 100) * 4095);
+    const pwm = Math.round((sliderB.value / 100) * 4095);
     client.publish("pranav/esp32/rgb/cmd/b", pwm.toString());
     updateSetColor();
   };
 
-// ---- Color Update Functions ----
+  // ---- Color Update Functions ----
   function updateSetColor() {
     const brt = sliderBrightness.value / 100;
 
