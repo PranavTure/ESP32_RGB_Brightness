@@ -67,7 +67,7 @@
   // ---- ESP32 Feedback ----
   client.on("message", (topic, message) => {
     const pwm = parseInt(message.toString());
-    const percent = Math.round((pwm / 65535) * 100);
+    const percent = Math.round((pwm / 4095) * 100);
 
     if (topic === "pranav/esp32/rgb/status/brightness") {
       sliderBrightness.value = percent;
@@ -92,28 +92,28 @@
   // ---- Slider Handlers (Web → ESP32) ----
   sliderBrightness.oninput = () => {
     valBrightness.innerText = sliderBrightness.value;
-    const pwm = Math.round((sliderBrightness.value / 100) * 65535);
+    const pwm = Math.round((sliderBrightness.value / 100) * 4095);
     client.publish("pranav/esp32/rgb/cmd/brightness", pwm.toString());
     updateSetColor();
   };
 
   sliderR.oninput = () => {
     valR.innerText = sliderR.value;
-    const pwm = Math.round((sliderR.value / 100) * 65535);
+    const pwm = Math.round((sliderR.value / 100) * 4095);
     client.publish("pranav/esp32/rgb/cmd/r", pwm.toString());
     updateSetColor();
   };
 
   sliderG.oninput = () => {
     valG.innerText = sliderG.value;
-    const pwm = Math.round((sliderG.value / 100) * 65535);
+    const pwm = Math.round((sliderG.value / 100) * 4095);
     client.publish("pranav/esp32/rgb/cmd/g", pwm.toString());
     updateSetColor();
   };
 
   sliderB.oninput = () => {
     valB.innerText = sliderB.value;
-    const pwm = Math.round((sliderB.value / 100) * 65535);
+    const pwm = Math.round((sliderB.value / 100) * 4095);
     client.publish("pranav/esp32/rgb/cmd/b", pwm.toString());
     updateSetColor();
   };
