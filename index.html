@@ -118,19 +118,25 @@
     updateSetColor();
   };
 
-  // ---- Color Update Functions ----
+// ---- Color Update Functions ----
   function updateSetColor() {
-    setColorBox.style.backgroundColor =
-      `rgb(${sliderR.value * 2.55},
-           ${sliderG.value * 2.55},
-           ${sliderB.value * 2.55})`;
+    const brt = sliderBrightness.value / 100;
+
+    const r = Math.round(sliderR.value * 2.55 * brt);
+    const g = Math.round(sliderG.value * 2.55 * brt);
+    const b = Math.round(sliderB.value * 2.55 * brt);
+
+    setColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
   }
 
   function updateFeedbackColor() {
-    fbColorBox.style.backgroundColor =
-      `rgb(${sliderR.value * 2.55},
-           ${sliderG.value * 2.55},
-           ${sliderB.value * 2.55})`;
+    const brt = sliderBrightness.value / 100;
+
+    const r = Math.round(sliderR.value * 2.55 * brt);
+    const g = Math.round(sliderG.value * 2.55 * brt);
+    const b = Math.round(sliderB.value * 2.55 * brt);
+
+    fbColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
   }
 </script>
 
