@@ -51,6 +51,9 @@
   const setColorBox = document.getElementById("setColor");
   const fbColorBox  = document.getElementById("fbColor");
 
+  // ---- ESP32 STATE (REAL FEEDBACK) ----
+  let esp_brt = 0, esp_r = 0, esp_g = 0, esp_b = 0;
+
   // ---- MQTT ----
   const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
     clientId: "WebClient_JSON_" + Math.floor(Math.random() * 10000)
@@ -61,29 +64,29 @@
     client.subscribe("pranav/esp32/rgb/status/json");
   });
 
-  // ---- ESP32 Feedback (JSON) ----
+  // ---- ESP32 → WEB (JSON Feedback) ----
   client.on("message", (topic, message) => {
     const data = JSON.parse(message.toString());
 
-    const brt = Math.round((data.brt / 4095) * 100);
-    const r   = Math.round((data.r   / 4095) * 100);
-    const g   = Math.round((data.g   / 4095) * 100);
-    const b   = Math.round((data.b   / 4095) * 100);
+    esp_brt = Math.round((data.brt / 4095) * 100);
+    esp_r   = Math.round((data.r   / 4095) * 100);
+    esp_g   = Math.round((data.g   / 4095) * 100);
+    esp_b   = Math.round((data.b   / 4095) * 100);
 
-    sliderBrightness.value = brt;
-    sliderR.value = r;
-    sliderG.value = g;
-    sliderB.value = b;
+    sliderBrightness.value = esp_brt;
+    sliderR.value = esp_r;
+    sliderG.value = esp_g;
+    sliderB.value = esp_b;
 
-    valBrightness.innerText = brt;
-    valR.innerText = r;
-    valG.innerText = g;
-    valB.innerText = b;
+    valBrightness.innerText = esp_brt;
+    valR.innerText = esp_r;
+    valG.innerText = esp_g;
+    valB.innerText = esp_b;
 
-    updateFeedbackColor();   // EXACT same logic as non-JSON
+    updateFeedbackColor();   // REAL ESP32 COLOR
   });
 
-  // ---- Web → ESP32 (JSON) ----
+  // ---- WEB → ESP32 (JSON Command) ----
   function publishJSON() {
     const payload = {
       brt: Math.round((sliderBrightness.value / 100) * 4095),
@@ -106,11 +109,11 @@
       valB.innerText = sliderB.value;
 
       publishJSON();
-      updateSetColor();      // EXACT same logic
+      updateSetColor();   // WEB color only
     };
   });
 
-  // ---- Color Logic (UNCHANGED) ----
+  // ---- COLOR LOGIC (UNCHANGED MATH) ----
   function updateSetColor() {
     const brt = sliderBrightness.value / 100;
 
@@ -122,11 +125,11 @@
   }
 
   function updateFeedbackColor() {
-    const brt = sliderBrightness.value / 100;
+    const brt = esp_brt / 100;
 
-    const r = Math.round(sliderR.value * 2.55 * brt);
-    const g = Math.round(sliderG.value * 2.55 * brt);
-    const b = Math.round(sliderB.value * 2.55 * brt);
+    const r = Math.round(esp_r * 2.55 * brt);
+    const g = Math.round(esp_g * 2.55 * brt);
+    const b = Math.round(esp_b * 2.55 * brt);
 
     fbColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
   }
