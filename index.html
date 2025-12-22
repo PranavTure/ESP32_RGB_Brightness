@@ -1,74 +1,97 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ESP32 RGB JSON Control</title>
+  <title>ESP32 RGB & Brightness Control (JSON)</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 
-<body style="text-align:center;font-family:Arial;background:black;color:white;">
+<body style="text-align:center; font-family:Arial; background-color:black; color:white;">
 
-<h1>RGB & Brightness (JSON)</h1>
+<h1>RGB & Brightness Control</h1>
 
-<input type="range" id="brt" min="0" max="100" value="0">
-<p>Brightness: <span id="vbrt">0</span>%</p>
+<!-- Brightness -->
+<input type="range" id="sliderBrightness" min="0" max="100" value="0"
+       style="width:300px; accent-color:white;">
+<p>Brightness: <span id="valBrightness">0</span>%</p>
 
-<input type="range" id="r" min="0" max="100" value="0">
-<p>Red: <span id="vr">0</span>%</p>
+<!-- Red -->
+<input type="range" id="sliderR" min="0" max="100" value="0"
+       style="width:300px; accent-color:red;">
+<p>Red: <span id="valR">0</span>%</p>
 
-<input type="range" id="g" min="0" max="100" value="0">
-<p>Green: <span id="vg">0</span>%</p>
+<!-- Green -->
+<input type="range" id="sliderG" min="0" max="100" value="0"
+       style="width:300px; accent-color:green;">
+<p>Green: <span id="valG">0</span>%</p>
 
-<input type="range" id="b" min="0" max="100" value="0">
-<p>Blue: <span id="vb">0</span>%</p>
+<!-- Blue -->
+<input type="range" id="sliderB" min="0" max="100" value="0"
+       style="width:300px; accent-color:blue;">
+<p>Blue: <span id="valB">0</span>%</p>
 
-<div id="color" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
+<!-- Color preview boxes -->
+<p>Set Color (Web)</p>
+<div id="setColor"
+     style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
+
+<p>ESP32 Feedback Color</p>
+<div id="fbColor"
+     style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
 
 <script>
-const brt = document.getElementById("brt");
-const r   = document.getElementById("r");
-const g   = document.getElementById("g");
-const b   = document.getElementById("b");
+  // ---- DOM ----
+  const sliderBrightness = document.getElementById("sliderBrightness");
+  const sliderR = document.getElementById("sliderR");
+  const sliderG = document.getElementById("sliderG");
+  const sliderB = document.getElementById("sliderB");
 
-const vbrt = document.getElementById("vbrt");
-const vr = document.getElementById("vr");
-const vg = document.getElementById("vg");
-const vb = document.getElementById("vb");
+  const valBrightness = document.getElementById("valBrightness");
+  const valR = document.getElementById("valR");
+  const valG = document.getElementById("valG");
+  const valB = document.getElementById("valB");
 
-const box = document.getElementById("color");
+  const setColorBox = document.getElementById("setColor");
+  const fbColorBox  = document.getElementById("fbColor");
 
-const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
-  clientId: "web_" + Math.random()
-});
+  // ---- MQTT ----
+  const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
+    clientId: "WebJSON_" + Math.floor(Math.random() * 10000)
+  });
 
-function publishJSON() {
-  const payload = {
-    r:   Math.round(r.value   * 40.95),
-    g:   Math.round(g.value   * 40.95),
-    b:   Math.round(b.value   * 40.95),
-    brt: Math.round(brt.value * 40.95)
-  };
+  function publishJSON() {
+    const payload = {
+      r:   Math.round(sliderR.value   * 40.95),
+      g:   Math.round(sliderG.value   * 40.95),
+      b:   Math.round(sliderB.value   * 40.95),
+      brt: Math.round(sliderBrightness.value * 40.95)
+    };
 
-  client.publish(
-    "pranav/esp32/rgb/cmd/json",
-    JSON.stringify(payload)
-  );
+    client.publish(
+      "pranav/esp32/rgb/cmd/json",
+      JSON.stringify(payload)
+    );
+  }
 
-  const scale = brt.value / 100;
-  box.style.background =
-    `rgb(${r.value*2.55*scale},
-         ${g.value*2.55*scale},
-         ${b.value*2.55*scale})`;
-}
+  function updateColor(box) {
+    const brt = sliderBrightness.value / 100;
+    const r = Math.round(sliderR.value * 2.55 * brt);
+    const g = Math.round(sliderG.value * 2.55 * brt);
+    const b = Math.round(sliderB.value * 2.55 * brt);
+    box.style.backgroundColor = `rgb(${r},${g},${b})`;
+  }
 
-[r, g, b, brt].forEach(sl => {
-  sl.oninput = () => {
-    vr.innerText = r.value;
-    vg.innerText = g.value;
-    vb.innerText = b.value;
-    vbrt.innerText = brt.value;
-    publishJSON();
-  };
-});
+  [sliderBrightness, sliderR, sliderG, sliderB].forEach(sl => {
+    sl.oninput = () => {
+      valBrightness.innerText = sliderBrightness.value;
+      valR.innerText = sliderR.value;
+      valG.innerText = sliderG.value;
+      valB.innerText = sliderB.value;
+
+      publishJSON();
+      updateColor(setColorBox);
+      updateColor(fbColorBox); // mirror ESP32 feedback
+    };
+  });
 </script>
 
 </body>
