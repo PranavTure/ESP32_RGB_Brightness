@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ESP32 RGB & Brightness Control (JSON)</title>
+  <title>ESP32 RGB & Brightness Control</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 
@@ -31,12 +31,10 @@
 
 <!-- Color preview boxes -->
 <p>Set Color (Web)</p>
-<div id="setColor"
-     style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
+<div id="setColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
 
 <p>ESP32 Feedback Color</p>
-<div id="fbColor"
-     style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
+<div id="fbColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
 
 <script>
   // ---- DOM ----
@@ -55,29 +53,49 @@
 
   // ---- MQTT ----
   const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
-    clientId: "WebJSON_" + Math.floor(Math.random() * 10000)
+    clientId: "WebClient_JSON_" + Math.floor(Math.random() * 10000)
   });
 
+  client.on("connect", () => {
+    console.log("Connected to MQTT");
+    client.subscribe("pranav/esp32/rgb/status/json");
+  });
+
+  // ---- ESP32 Feedback (JSON) ----
+  client.on("message", (topic, message) => {
+    const data = JSON.parse(message.toString());
+
+    const brt = Math.round((data.brt / 4095) * 100);
+    const r   = Math.round((data.r   / 4095) * 100);
+    const g   = Math.round((data.g   / 4095) * 100);
+    const b   = Math.round((data.b   / 4095) * 100);
+
+    sliderBrightness.value = brt;
+    sliderR.value = r;
+    sliderG.value = g;
+    sliderB.value = b;
+
+    valBrightness.innerText = brt;
+    valR.innerText = r;
+    valG.innerText = g;
+    valB.innerText = b;
+
+    updateFeedbackColor();   // EXACT same logic as non-JSON
+  });
+
+  // ---- Web → ESP32 (JSON) ----
   function publishJSON() {
     const payload = {
-      r:   Math.round(sliderR.value   * 40.95),
-      g:   Math.round(sliderG.value   * 40.95),
-      b:   Math.round(sliderB.value   * 40.95),
-      brt: Math.round(sliderBrightness.value * 40.95)
+      brt: Math.round((sliderBrightness.value / 100) * 4095),
+      r:   Math.round((sliderR.value / 100) * 4095),
+      g:   Math.round((sliderG.value / 100) * 4095),
+      b:   Math.round((sliderB.value / 100) * 4095)
     };
 
     client.publish(
       "pranav/esp32/rgb/cmd/json",
       JSON.stringify(payload)
     );
-  }
-
-  function updateColor(box) {
-    const brt = sliderBrightness.value / 100;
-    const r = Math.round(sliderR.value * 2.55 * brt);
-    const g = Math.round(sliderG.value * 2.55 * brt);
-    const b = Math.round(sliderB.value * 2.55 * brt);
-    box.style.backgroundColor = `rgb(${r},${g},${b})`;
   }
 
   [sliderBrightness, sliderR, sliderG, sliderB].forEach(sl => {
@@ -88,10 +106,30 @@
       valB.innerText = sliderB.value;
 
       publishJSON();
-      updateColor(setColorBox);
-      updateColor(fbColorBox); // mirror ESP32 feedback
+      updateSetColor();      // EXACT same logic
     };
   });
+
+  // ---- Color Logic (UNCHANGED) ----
+  function updateSetColor() {
+    const brt = sliderBrightness.value / 100;
+
+    const r = Math.round(sliderR.value * 2.55 * brt);
+    const g = Math.round(sliderG.value * 2.55 * brt);
+    const b = Math.round(sliderB.value * 2.55 * brt);
+
+    setColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+  }
+
+  function updateFeedbackColor() {
+    const brt = sliderBrightness.value / 100;
+
+    const r = Math.round(sliderR.value * 2.55 * brt);
+    const g = Math.round(sliderG.value * 2.55 * brt);
+    const b = Math.round(sliderB.value * 2.55 * brt);
+
+    fbColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+  }
 </script>
 
 </body>
