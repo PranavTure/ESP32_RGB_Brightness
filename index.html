@@ -7,6 +7,18 @@
 
 <body style="text-align:center; font-family:Arial; background-color:black; color:white;">
 
+<!-- ================= LOGIN BOX ================= -->
+<div id="loginBox">
+  <h2>Login</h2>
+  <input id="username" placeholder="Username"><br><br>
+  <input id="password" type="password" placeholder="Password"><br><br>
+  <button onclick="login()">Login</button>
+  <p id="loginMsg" style="color:red;"></p>
+</div>
+
+<!-- ================= MAIN UI ================= -->
+<div id="mainUI" style="display:none;">
+
 <h1>RGB & Brightness Control</h1>
 
 <!-- Brightness -->
@@ -25,15 +37,52 @@
 <input type="range" id="sliderB" min="0" max="100" value="0" style="width:300px; accent-color:blue;">
 <p>Blue: <span id="valB">0</span>%</p>
 
-<!-- Color preview boxes -->
 <p>Set Color (Web)</p>
 <div id="setColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
 
 <p>ESP32 Feedback Color</p>
 <div id="fbColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
 
+</div>
+
 <script>
-  // ---- DOM Elements ----
+/* ================= SESSION ================= */
+let sessionId = localStorage.getItem("sid");
+
+async function login() {
+  const u = document.getElementById("username").value;
+  const p = document.getElementById("password").value;
+
+  const r = await fetch(`/login?u=${u}&p=${p}`);
+  if (r.status === 200) {
+    sessionId = await r.text();
+    localStorage.setItem("sid", sessionId);
+    location.reload();
+  } else {
+    document.getElementById("loginMsg").innerText = "Invalid login";
+  }
+}
+
+async function validateSession() {
+  if (!sessionId) return false;
+  const r = await fetch(`/validate?sid=${sessionId}`);
+  return r.status === 200;
+}
+
+(async () => {
+  const ok = await validateSession();
+  if (ok) {
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("mainUI").style.display = "block";
+    initMQTT();
+  } else {
+    localStorage.removeItem("sid");
+  }
+})();
+
+/* ================= MQTT + RGB LOGIC ================= */
+function initMQTT() {
+
   const sliderBrightness = document.getElementById("sliderBrightness");
   const valBrightness = document.getElementById("valBrightness");
 
@@ -49,95 +98,58 @@
   const setColorBox = document.getElementById("setColor");
   const fbColorBox = document.getElementById("fbColor");
 
-  // ---- MQTT Client ----
   const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
     clientId: "WebClient_" + Math.floor(Math.random() * 10000)
   });
 
-  // ---- On Connect ----
   client.on("connect", () => {
-    console.log("Connected to MQTT");
-
     client.subscribe("pranav/esp32/rgb/status/brightness");
     client.subscribe("pranav/esp32/rgb/status/r");
     client.subscribe("pranav/esp32/rgb/status/g");
     client.subscribe("pranav/esp32/rgb/status/b");
   });
 
-  // ---- ESP32 Feedback ----
   client.on("message", (topic, message) => {
     const pwm = parseInt(message.toString());
     const percent = Math.round((pwm / 4095) * 100);
 
-    if (topic === "pranav/esp32/rgb/status/brightness") {
+    if (topic.endsWith("brightness")) {
       sliderBrightness.value = percent;
       valBrightness.innerText = percent;
-    }
-    else if (topic === "pranav/esp32/rgb/status/r") {
+    } else if (topic.endsWith("/r")) {
       sliderR.value = percent;
       valR.innerText = percent;
-    }
-    else if (topic === "pranav/esp32/rgb/status/g") {
+    } else if (topic.endsWith("/g")) {
       sliderG.value = percent;
       valG.innerText = percent;
-    }
-    else if (topic === "pranav/esp32/rgb/status/b") {
+    } else if (topic.endsWith("/b")) {
       sliderB.value = percent;
       valB.innerText = percent;
     }
-
-    updateFeedbackColor();
+    updateColor();
   });
 
-  // ---- Slider Handlers (Web → ESP32) ----
-  sliderBrightness.oninput = () => {
-    valBrightness.innerText = sliderBrightness.value;
-    const pwm = Math.round((sliderBrightness.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/brightness", pwm.toString());
-    updateSetColor();
-  };
+  sliderBrightness.oninput = () => send("brightness", sliderBrightness, valBrightness);
+  sliderR.oninput = () => send("r", sliderR, valR);
+  sliderG.oninput = () => send("g", sliderG, valG);
+  sliderB.oninput = () => send("b", sliderB, valB);
 
-  sliderR.oninput = () => {
-    valR.innerText = sliderR.value;
-    const pwm = Math.round((sliderR.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/r", pwm.toString());
-    updateSetColor();
-  };
+  function send(ch, slider, label) {
+    label.innerText = slider.value;
+    const pwm = Math.round((slider.value / 100) * 4095);
+    client.publish(`pranav/esp32/rgb/cmd/${ch}`, pwm.toString());
+    updateColor();
+  }
 
-  sliderG.oninput = () => {
-    valG.innerText = sliderG.value;
-    const pwm = Math.round((sliderG.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/g", pwm.toString());
-    updateSetColor();
-  };
-
-  sliderB.oninput = () => {
-    valB.innerText = sliderB.value;
-    const pwm = Math.round((sliderB.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/b", pwm.toString());
-    updateSetColor();
-  };
-
-  // ---- Color Update Functions ----
-  function updateSetColor() {
+  function updateColor() {
     const brt = sliderBrightness.value / 100;
-
     const r = Math.round(sliderR.value * 2.55 * brt);
     const g = Math.round(sliderG.value * 2.55 * brt);
     const b = Math.round(sliderB.value * 2.55 * brt);
-
-    setColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+    setColorBox.style.backgroundColor = `rgb(${r},${g},${b})`;
+    fbColorBox.style.backgroundColor = `rgb(${r},${g},${b})`;
   }
-
-  function updateFeedbackColor() {
-    const brt = sliderBrightness.value / 100;
-
-    const r = Math.round(sliderR.value * 2.55 * brt);
-    const g = Math.round(sliderG.value * 2.55 * brt);
-    const b = Math.round(sliderB.value * 2.55 * brt);
-
-    fbColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-  }
+}
 </script>
 
 </body>
