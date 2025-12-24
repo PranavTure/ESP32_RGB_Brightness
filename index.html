@@ -1,190 +1,91 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ESP32 RGB & Brightness Control</title>
+  <title>ESP32 RGB Secure Control</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 
-<body style="text-align:center; font-family:Arial; background-color:black; color:white;">
+<body style="background:black;color:white;text-align:center;font-family:Arial">
 
-<!-- ---------- LOGIN OVERLAY (ADDED) ---------- -->
-<div id="loginOverlay" style="
-  position:fixed;
-  top:0; left:0;
-  width:100%; height:100%;
-  background:black;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
-">
-  <div>
-    <h2>Login</h2>
-    <input id="username" placeholder="Username"><br><br>
-    <input id="password" type="password" placeholder="Password"><br><br>
-    <button onclick="login()">Login</button>
-    <p id="loginMsg" style="color:red;"></p>
-  </div>
+<h2>ESP32 Secure RGB Control</h2>
+
+<!-- LOGIN -->
+<div id="loginBox">
+  <input id="uid" placeholder="Username"><br><br>
+  <input id="pwd" type="password" placeholder="Password"><br><br>
+  <button onclick="login()">Login</button>
 </div>
 
-<h1>RGB & Brightness Control</h1>
-
-<!-- Brightness -->
-<input type="range" id="sliderBrightness" min="0" max="100" value="0" style="width:300px; accent-color:white;">
-<p>Brightness: <span id="valBrightness">0</span>%</p>
-
-<!-- Red -->
-<input type="range" id="sliderR" min="0" max="100" value="0" style="width:300px; accent-color:red;">
-<p>Red: <span id="valR">0</span>%</p>
-
-<!-- Green -->
-<input type="range" id="sliderG" min="0" max="100" value="0" style="width:300px; accent-color:green;">
-<p>Green: <span id="valG">0</span>%</p>
-
-<!-- Blue -->
-<input type="range" id="sliderB" min="0" max="100" value="0" style="width:300px; accent-color:blue;">
-<p>Blue: <span id="valB">0</span>%</p>
-
-<!-- Color preview boxes -->
-<p>Set Color (Web)</p>
-<div id="setColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
-
-<p>ESP32 Feedback Color</p>
-<div id="fbColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
+<!-- CONTROL -->
+<div id="controlBox" style="display:none;">
+  <h3>Controls</h3>
+  Brightness <input type="range" min="0" max="4095" oninput="sendCmd('BRT', this.value)"><br><br>
+  R <input type="range" min="0" max="4095" oninput="sendCmd('R', this.value)"><br><br>
+  G <input type="range" min="0" max="4095" oninput="sendCmd('G', this.value)"><br><br>
+  B <input type="range" min="0" max="4095" oninput="sendCmd('B', this.value)">
+</div>
 
 <script>
-  /* ---------- AUTH CONFIG (ADDED) ---------- */
-  const SESSION_TIMEOUT_MIN = 5;
-  let isAuthenticated = false;
-  let sessionTimer = null;
+/* ===== MQTT CONFIG ===== */
+const broker = "wss://broker.hivemq.com:8884/mqtt";
+const client = mqtt.connect(broker);
 
-  function login() {
-    const u = username.value;
-    const p = password.value;
+/* ===== TOPICS ===== */
+const T_LOGIN = "esp32/rgb/auth/login";
+const T_RESP  = "esp32/rgb/auth/resp";
+const T_CMD   = "esp32/rgb/cmd";
+const T_ACK   = "esp32/rgb/ack";
 
-    if (u === "admin" && p === "admin123") {
-      isAuthenticated = true;
-      loginOverlay.style.display = "none";
+/* ===== STATE ===== */
+let esp_sid = "";
+let nonce = 1;
 
-      sessionTimer = setTimeout(() => {
-        isAuthenticated = false;
-        loginOverlay.style.display = "flex";
-        loginMsg.innerText = "Session expired";
-      }, SESSION_TIMEOUT_MIN * 60 * 1000);
-    } else {
-      loginMsg.innerText = "Invalid credentials";
-    }
+/* ===== MQTT EVENTS ===== */
+client.on("connect", () => {
+  console.log("MQTT Connected");
+  client.subscribe(T_RESP);
+  client.subscribe(T_ACK);
+});
+
+client.on("message", (topic, message) => {
+  const msg = JSON.parse(message.toString());
+
+  if (topic === T_RESP) {
+    esp_sid = msg.esp_sid;
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("controlBox").style.display = "block";
+    alert("Login successful");
   }
 
-  // ---- DOM Elements ----
-  const sliderBrightness = document.getElementById("sliderBrightness");
-  const valBrightness = document.getElementById("valBrightness");
-
-  const sliderR = document.getElementById("sliderR");
-  const valR = document.getElementById("valR");
-
-  const sliderG = document.getElementById("sliderG");
-  const valG = document.getElementById("valG");
-
-  const sliderB = document.getElementById("sliderB");
-  const valB = document.getElementById("valB");
-
-  const setColorBox = document.getElementById("setColor");
-  const fbColorBox = document.getElementById("fbColor");
-
-  // ---- MQTT Client ----
-  const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
-    clientId: "WebClient_" + Math.floor(Math.random() * 10000)
-  });
-
-  // ---- On Connect ----
-  client.on("connect", () => {
-    console.log("Connected to MQTT");
-
-    client.subscribe("pranav/esp32/rgb/status/brightness");
-    client.subscribe("pranav/esp32/rgb/status/r");
-    client.subscribe("pranav/esp32/rgb/status/g");
-    client.subscribe("pranav/esp32/rgb/status/b");
-  });
-
-  // ---- ESP32 Feedback ----
-  client.on("message", (topic, message) => {
-    const pwm = parseInt(message.toString());
-    const percent = Math.round((pwm / 4095) * 100);
-
-    if (topic === "pranav/esp32/rgb/status/brightness") {
-      sliderBrightness.value = percent;
-      valBrightness.innerText = percent;
-    }
-    else if (topic === "pranav/esp32/rgb/status/r") {
-      sliderR.value = percent;
-      valR.innerText = percent;
-    }
-    else if (topic === "pranav/esp32/rgb/status/g") {
-      sliderG.value = percent;
-      valG.innerText = percent;
-    }
-    else if (topic === "pranav/esp32/rgb/status/b") {
-      sliderB.value = percent;
-      valB.innerText = percent;
-    }
-
-    updateFeedbackColor();
-  });
-
-  // ---- Slider Handlers (Web → ESP32) ----
-  sliderBrightness.oninput = () => {
-    if (!isAuthenticated) return;
-    valBrightness.innerText = sliderBrightness.value;
-    const pwm = Math.round((sliderBrightness.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/brightness", pwm.toString());
-    updateSetColor();
-  };
-
-  sliderR.oninput = () => {
-    if (!isAuthenticated) return;
-    valR.innerText = sliderR.value;
-    const pwm = Math.round((sliderR.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/r", pwm.toString());
-    updateSetColor();
-  };
-
-  sliderG.oninput = () => {
-    if (!isAuthenticated) return;
-    valG.innerText = sliderG.value;
-    const pwm = Math.round((sliderG.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/g", pwm.toString());
-    updateSetColor();
-  };
-
-  sliderB.oninput = () => {
-    if (!isAuthenticated) return;
-    valB.innerText = sliderB.value;
-    const pwm = Math.round((sliderB.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/b", pwm.toString());
-    updateSetColor();
-  };
-
-  // ---- Color Update Functions ----
-  function updateSetColor() {
-    const brt = sliderBrightness.value / 100;
-
-    const r = Math.round(sliderR.value * 2.55 * brt);
-    const g = Math.round(sliderG.value * 2.55 * brt);
-    const b = Math.round(sliderB.value * 2.55 * brt);
-
-    setColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+  if (topic === T_ACK) {
+    console.log("ACK:", msg);
   }
+});
 
-  function updateFeedbackColor() {
-    const brt = sliderBrightness.value / 100;
+/* ===== LOGIN ===== */
+function login() {
+  const payload = {
+    uid: document.getElementById("uid").value,
+    pwd: document.getElementById("pwd").value,
+    nonce: nonce++,
+    ts: Math.floor(Date.now() / 1000)
+  };
+  client.publish(T_LOGIN, JSON.stringify(payload));
+}
 
-    const r = Math.round(sliderR.value * 2.55 * brt);
-    const g = Math.round(sliderG.value * 2.55 * brt);
-    const b = Math.round(sliderB.value * 2.55 * brt);
+/* ===== SEND COMMAND ===== */
+function sendCmd(cmd, val) {
+  if (!esp_sid) return;
 
-    fbColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-  }
+  const payload = {
+    esp_sid: esp_sid,
+    cmd: cmd,
+    val: parseInt(val),
+    nonce: nonce++,
+    ts: Math.floor(Date.now() / 1000)
+  };
+  client.publish(T_CMD, JSON.stringify(payload));
+}
 </script>
 
 </body>
