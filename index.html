@@ -9,40 +9,35 @@
 
 <h2>ESP32 Secure RGB Control</h2>
 
-<!-- LOGIN -->
 <div id="loginBox">
   <input id="uid" placeholder="Username"><br><br>
   <input id="pwd" type="password" placeholder="Password"><br><br>
   <button onclick="login()">Login</button>
 </div>
 
-<!-- CONTROL -->
 <div id="controlBox" style="display:none;">
   <h3>Controls</h3>
-  Brightness <input type="range" min="0" max="4095" oninput="sendCmd('BRT', this.value)"><br><br>
-  R <input type="range" min="0" max="4095" oninput="sendCmd('R', this.value)"><br><br>
-  G <input type="range" min="0" max="4095" oninput="sendCmd('G', this.value)"><br><br>
+  Brightness <input type="range" min="0" max="4095" oninput="sendCmd('BRT', this.value)">
+  <br><br>
+  R <input type="range" min="0" max="4095" oninput="sendCmd('R', this.value)">
+  <br><br>
+  G <input type="range" min="0" max="4095" oninput="sendCmd('G', this.value)">
+  <br><br>
   B <input type="range" min="0" max="4095" oninput="sendCmd('B', this.value)">
 </div>
 
 <script>
-/* ===== MQTT CONFIG ===== */
 const broker = "wss://broker.hivemq.com:8884/mqtt";
 const client = mqtt.connect(broker);
 
-/* ===== TOPICS ===== */
 const T_LOGIN = "esp32/rgb/auth/login";
 const T_RESP  = "esp32/rgb/auth/resp";
 const T_CMD   = "esp32/rgb/cmd";
 const T_ACK   = "esp32/rgb/ack";
 
-/* ===== STATE ===== */
-let esp_sid = "";
-let nonce = 1;
+let esp_sid = null;
 
-/* ===== MQTT EVENTS ===== */
 client.on("connect", () => {
-  console.log("MQTT Connected");
   client.subscribe(T_RESP);
   client.subscribe(T_ACK);
 });
@@ -50,11 +45,11 @@ client.on("connect", () => {
 client.on("message", (topic, message) => {
   const msg = JSON.parse(message.toString());
 
-  if (topic === T_RESP) {
+  if (topic === T_RESP && msg.esp_sid) {
     esp_sid = msg.esp_sid;
     document.getElementById("loginBox").style.display = "none";
     document.getElementById("controlBox").style.display = "block";
-    alert("Login successful");
+    console.log("Logged in");
   }
 
   if (topic === T_ACK) {
@@ -62,18 +57,16 @@ client.on("message", (topic, message) => {
   }
 });
 
-/* ===== LOGIN ===== */
 function login() {
   const payload = {
     uid: document.getElementById("uid").value,
     pwd: document.getElementById("pwd").value,
-    nonce: nonce++,
+    nonce: Date.now(),
     ts: Math.floor(Date.now() / 1000)
   };
   client.publish(T_LOGIN, JSON.stringify(payload));
 }
 
-/* ===== SEND COMMAND ===== */
 function sendCmd(cmd, val) {
   if (!esp_sid) return;
 
@@ -81,7 +74,7 @@ function sendCmd(cmd, val) {
     esp_sid: esp_sid,
     cmd: cmd,
     val: parseInt(val),
-    nonce: nonce++,
+    nonce: Date.now(),
     ts: Math.floor(Date.now() / 1000)
   };
   client.publish(T_CMD, JSON.stringify(payload));
