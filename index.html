@@ -1,142 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ESP32 RGB & Brightness Control</title>
+  <title>ESP32 Fan Control</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: black;
+      color: white;
+      text-align: center;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 18px;
+      margin: 10px;
+      cursor: pointer;
+    }
+  </style>
 </head>
+<body>
+  <h2>ESP32 Fan Control</h2>
 
-<body style="text-align:center; font-family:Arial; background-color:black; color:white;">
+  <button onclick="fanOn()">FAN ON</button>
+  <button onclick="fanOff()">FAN OFF</button>
 
-<h1>RGB & Brightness Control</h1>
-
-<!-- Brightness -->
-<input type="range" id="sliderBrightness" min="0" max="100" value="0" style="width:300px; accent-color:white;">
-<p>Brightness: <span id="valBrightness">0</span>%</p>
-
-<!-- Red -->
-<input type="range" id="sliderR" min="0" max="100" value="0" style="width:300px; accent-color:red;">
-<p>Red: <span id="valR">0</span>%</p>
-
-<!-- Green -->
-<input type="range" id="sliderG" min="0" max="100" value="0" style="width:300px; accent-color:green;">
-<p>Green: <span id="valG">0</span>%</p>
-
-<!-- Blue -->
-<input type="range" id="sliderB" min="0" max="100" value="0" style="width:300px; accent-color:blue;">
-<p>Blue: <span id="valB">0</span>%</p>
-
-<!-- Color preview boxes -->
-<p>Set Color (Web)</p>
-<div id="setColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
-
-<p>ESP32 Feedback Color</p>
-<div id="fbColor" style="width:120px;height:120px;border:2px solid white;margin:auto;"></div>
+  <p id="status">Status: --</p>
 
 <script>
-  // ---- DOM Elements ----
-  const sliderBrightness = document.getElementById("sliderBrightness");
-  const valBrightness = document.getElementById("valBrightness");
+  // MQTT broker (use websocket if hosted on GitHub Pages)
+  const broker = "wss://broker.hivemq.com:8000/mqtt";
+  const topicCmd = "myhome/myroom/scramb/command";
+  const topicAck = "myhome/myroom/scramb/feedback";
 
-  const sliderR = document.getElementById("sliderR");
-  const valR = document.getElementById("valR");
+  const client = mqtt.connect(broker);
 
-  const sliderG = document.getElementById("sliderG");
-  const valG = document.getElementById("valG");
-
-  const sliderB = document.getElementById("sliderB");
-  const valB = document.getElementById("valB");
-
-  const setColorBox = document.getElementById("setColor");
-  const fbColorBox = document.getElementById("fbColor");
-
-  // ---- MQTT Client ----
-  const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
-    clientId: "WebClient_" + Math.floor(Math.random() * 10000)
-  });
-
-  // ---- On Connect ----
   client.on("connect", () => {
-    console.log("Connected to MQTT");
-
-    client.subscribe("pranav/esp32/rgb/status/brightness");
-    client.subscribe("pranav/esp32/rgb/status/r");
-    client.subscribe("pranav/esp32/rgb/status/g");
-    client.subscribe("pranav/esp32/rgb/status/b");
+    console.log("Connected to MQTT broker");
+    client.subscribe(topicAck);
   });
 
-  // ---- ESP32 Feedback ----
   client.on("message", (topic, message) => {
-    const pwm = parseInt(message.toString());
-    const percent = Math.round((pwm / 4095) * 100);
-
-    if (topic === "pranav/esp32/rgb/status/brightness") {
-      sliderBrightness.value = percent;
-      valBrightness.innerText = percent;
+    if (topic === topicAck) {
+      const data = JSON.parse(message.toString());
+      document.getElementById("status").innerText =
+        "Status: Fan " + (data.fanState ? "ON" : "OFF");
     }
-    else if (topic === "pranav/esp32/rgb/status/r") {
-      sliderR.value = percent;
-      valR.innerText = percent;
-    }
-    else if (topic === "pranav/esp32/rgb/status/g") {
-      sliderG.value = percent;
-      valG.innerText = percent;
-    }
-    else if (topic === "pranav/esp32/rgb/status/b") {
-      sliderB.value = percent;
-      valB.innerText = percent;
-    }
-
-    updateFeedbackColor();
   });
 
-  // ---- Slider Handlers (Web → ESP32) ----
-  sliderBrightness.oninput = () => {
-    valBrightness.innerText = sliderBrightness.value;
-    const pwm = Math.round((sliderBrightness.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/brightness", pwm.toString());
-    updateSetColor();
-  };
-
-  sliderR.oninput = () => {
-    valR.innerText = sliderR.value;
-    const pwm = Math.round((sliderR.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/r", pwm.toString());
-    updateSetColor();
-  };
-
-  sliderG.oninput = () => {
-    valG.innerText = sliderG.value;
-    const pwm = Math.round((sliderG.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/g", pwm.toString());
-    updateSetColor();
-  };
-
-  sliderB.oninput = () => {
-    valB.innerText = sliderB.value;
-    const pwm = Math.round((sliderB.value / 100) * 4095);
-    client.publish("pranav/esp32/rgb/cmd/b", pwm.toString());
-    updateSetColor();
-  };
-
-  // ---- Color Update Functions ----
-  function updateSetColor() {
-    const brt = sliderBrightness.value / 100;
-
-    const r = Math.round(sliderR.value * 2.55 * brt);
-    const g = Math.round(sliderG.value * 2.55 * brt);
-    const b = Math.round(sliderB.value * 2.55 * brt);
-
-    setColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+  function fanOn() {
+    client.publish(topicCmd, JSON.stringify({ fanState: 1 }), { retain: true });
   }
 
-  function updateFeedbackColor() {
-    const brt = sliderBrightness.value / 100;
-
-    const r = Math.round(sliderR.value * 2.55 * brt);
-    const g = Math.round(sliderG.value * 2.55 * brt);
-    const b = Math.round(sliderB.value * 2.55 * brt);
-
-    fbColorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+  function fanOff() {
+    client.publish(topicCmd, JSON.stringify({ fanState: 0 }), { retain: true });
   }
 </script>
 
